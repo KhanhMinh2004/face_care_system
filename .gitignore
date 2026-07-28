@@ -8,11 +8,6 @@ backend/models/
 # ── Vector store FAISS ────────────────────────────────────────────────────
 backend/ml/llm/
 
-# ── Deep learning / training code ────────────────────────────────────────
-notebooks/
-*.ipynb
-deeplearning/
-# ── Python ───────────────────────────────────────────────────────────────
 .venv/
 __pycache__/
 *.pyc
@@ -78,4 +73,24 @@ Thumbs.db
 RAG_face.txt
 note.txt
 face_solution.txt
-log_configure.txt
+
+# Deep learning / training code ────────────────────────────────────────
+deeplearning/data
+deeplearning/classification/data
+deeplearning/classification/*.txt
+deeplearning/classification/*.h5
+deeplearning/classification/*.keras
+deeplearning/yolo/data 
+deeplearning/yolo/data_backup
+deeplearning/yolo/dataset_resized
+deeplearning/yolo/dataset_resized640
+deeplearning/yolo/visualize
+
+.cache/
+huggingface_cache/
+**/.cache/
+
+runs/
+wandb/
+tensorboard/
+events.out.tfevents*

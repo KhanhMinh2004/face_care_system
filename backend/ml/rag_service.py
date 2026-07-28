@@ -3,23 +3,30 @@ import google.generativeai as genai
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
-load_dotenv() 
-# ── Giữ nguyên ───────────────────────────────────────────────────────────
-_vector_db    = None
+
+load_dotenv()
+
+# ---------- Config ----------
+VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+GEMINI_MODEL = "gemini-2.5-flash"
+
+if not VECTOR_STORE_PATH:
+    raise RuntimeError("Missing VECTOR_STORE_PATH env var")
+if not GEMINI_API_KEY:
+    raise RuntimeError("Missing GEMINI_API_KEY env var")
+
+# ---------- Lazy singletons ----------
+_vector_db = None
 _gemini_model = None
 
-VECTOR_STORE_PATH = os.getenv(
-    "VECTOR_STORE_PATH"
-)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 def _get_vector_db():
     global _vector_db
     if _vector_db is None:
         print("[RAG] Loading FAISS vector store...")
-        embedding_model = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
         _vector_db = FAISS.load_local(
             VECTOR_STORE_PATH,
             embedding_model,
@@ -28,54 +35,110 @@ def _get_vector_db():
         print("[RAG] ✅ Vector store loaded")
     return _vector_db
 
+
 def _get_gemini():
     global _gemini_model
     if _gemini_model is None:
         genai.configure(api_key=GEMINI_API_KEY)
-        _gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+        _gemini_model = genai.GenerativeModel(GEMINI_MODEL)
         print("[RAG] ✅ Gemini model ready")
     return _gemini_model
 
+
+def _rewrite_prompt(
+    user_question: str,
+    summary_detail: str,
+    skin_context: str,
+    skin_label_vn: str,
+) -> str:
+    """
+    Viết lại câu hỏi người dùng thành chuỗi keyword tiếng Việt
+    tối ưu cho similarity search trên FAISS.
+    """
+    prompt = f"""Bạn là bộ trích xuất từ khóa cho hệ thống tìm kiếm tài liệu da liễu.
+
+Thông tin bệnh nhân:
+- Tình trạng da: {skin_label_vn}
+- Loại da: {skin_context}
+- Chi tiết: {summary_detail}
+- Câu hỏi: {user_question}
+
+Nhiệm vụ: Trả về MỘT dòng duy nhất gồm các từ khóa tiếng Việt liên quan,
+phân tách bằng dấu phẩy. Tập trung vào: tình trạng da, triệu chứng, hoạt chất,
+phương pháp điều trị/chăm sóc liên quan đến câu hỏi.
+
+QUY TẮC BẮT BUỘC:
+- KHÔNG giải thích, KHÔNG tiền tố ("Từ khóa:", "Dưới đây..."), KHÔNG markdown.
+- KHÔNG dùng câu hoàn chỉnh, chỉ dùng cụm từ khóa.
+- Tối đa 15 từ khóa.
+
+Ví dụ output đúng: da dầu mụn, mụn viêm, BHA, salicylic acid, kiềm dầu, chăm sóc da mụn
+"""
+    raw = _get_gemini().generate_content(prompt).text
+    print(f"[RAG] Rewritten query: {raw}")
+    return raw
+
+
+
+# ---------- Retrieval ----------
 def _retrieve_knowledge(query: str, k: int = 3) -> str:
     docs = _get_vector_db().similarity_search(query, k=k)
-    return "\n\n".join([doc.page_content for doc in docs])
+    return "\n\n".join(doc.page_content for doc in docs)
 
-# ── Chỉ sửa hàm này — bỏ severity, bỏ confidence ────────────────────────
 def get_skin_advice(
-    skin_label_vn:     str,
-    acne_detected:     bool,
+    skin_label_vn: str,
+    acne_detected: bool,
     darkspot_detected: bool,
-    summary_detail:    str,
-    user_question:     str = "Tôi nên chăm sóc da như thế nào?",
+    summary_detail: str,
+    user_question: str = "Tôi nên chăm sóc da như thế nào?",
+    skin_context: str = "",
 ) -> str:
+    # Tổng hợp kết quả phân tích da
     lines = [
         f"Tình trạng da: {skin_label_vn}.",
         f"Chi tiết phát hiện: {summary_detail}.",
-        "Có mụn đang hoạt động." if acne_detected else "Không phát hiện mụn.",
-        "Có đốm thâm." if darkspot_detected else "",
     ]
-    skin_result = "\n".join(l for l in lines if l)
+    if acne_detected:
+        lines.append("Có mụn đang hoạt động.")
+    else:
+        lines.append("Không phát hiện mụn.")
+    if darkspot_detected:
+        lines.append("Có đốm thâm.")
+    skin_result = "\n".join(lines)
 
-    rag_query = (
-        f"{user_question} "
-        f"{'mụn viêm' if acne_detected else ''} "
-        f"{'thâm' if darkspot_detected else ''}"
-    ).strip()
+    # Mở rộng câu hỏi với tín hiệu phát hiện được để rewrite có ngữ cảnh
+    enriched_question = user_question
+    extras = []
+    if acne_detected:
+        extras.append("mụn viêm")
+    if darkspot_detected:
+        extras.append("thâm sau mụn")
+    if extras:
+        enriched_question = f"{user_question} (lưu ý: {', '.join(extras)})"
 
+    # Rewrite -> retrieve
+    rag_query = _rewrite_prompt(
+        enriched_question, summary_detail, skin_context, skin_label_vn
+    )
     context = _retrieve_knowledge(rag_query)
+    print(f"[RAG] Retrieved context length: {len(context)} chars")
 
-    prompt = f"""
-Bạn là trợ lý tư vấn da liễu chuyên nghiệp.
+    final_prompt = f"""Bạn là trợ lý tư vấn da liễu chuyên nghiệp.
 
 Kết quả phân tích da:
 {skin_result}
 
-Kiến thức chuyên môn:
+Thông tin loại da:
+{skin_context}
+
+Kiến thức chuyên môn (chỉ dùng phần này, không bịa thêm):
 {context}
 
 Câu hỏi: {user_question}
 
-Chỉ dùng kiến thức trên. Trả lời tiếng Việt, rõ ràng, dễ hiểu.
+Trả lời tiếng Việt, rõ ràng, dễ hiểu. Nếu kiến thức trên không đủ
+để trả lời không được bịa và hãy nói rõ thay vì suy đoán.
 """.strip()
 
-    return _get_gemini().generate_content(prompt).text
+    print(f"[RAG] Final prompt for generation:\n{final_prompt}")
+    return _get_gemini().generate_content(final_prompt).text

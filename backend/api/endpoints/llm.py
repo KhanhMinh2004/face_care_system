@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from services.gemini_service import ask_gemini  # Assuming there's a module to interact with Gemini API
+from services.gemini_service import ask_gemini  
 from fastapi import APIRouter
 
 router = APIRouter()

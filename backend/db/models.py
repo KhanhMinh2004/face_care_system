@@ -21,15 +21,15 @@ class User(Base):
 class DiagnosisHistory(Base):
     __tablename__ = "history"
 
-    id            = Column(String, primary_key=True)        # uuid
+    id            = Column(String, primary_key=True)       
     user_id       = Column(Integer, ForeignKey("users.id"), nullable=True)
-    skin_label    = Column(String)                          # "good" | "bad"
-    skin_label_vn = Column(String)                          # "Da đẹp" | "Da xấu"
-    detections    = Column(JSON)                            # [{"label":"acne","count":2}]
-    summary       = Column(Text)                            # tóm tắt tổng hợp
-    image_url     = Column(String)                          # ảnh gốc trên MinIO
-    annotated_url = Column(String)                          # ảnh đã vẽ bbox
-    skin_context  = Column(String, nullable=True)           # "da dầu" / "da khô"
+    skin_label    = Column(String)                         
+    skin_label_vn = Column(String)                          
+    detections    = Column(JSON)                            
+    summary       = Column(Text)                           
+    image_url     = Column(String)                          
+    annotated_url = Column(String)                         
+    skin_context  = Column(String, nullable=True)           
     created_at    = Column(DateTime, default=datetime.utcnow)
 
 class Advice(Base):
@@ -38,6 +38,6 @@ class Advice(Base):
     id           = Column(Integer, primary_key=True, autoincrement=True)
     history_id   = Column(String, ForeignKey("history.id"), nullable=False)
     user_id      = Column(Integer, ForeignKey("users.id"), nullable=True)
-    user_question = Column(Text)                            # câu hỏi người dùng
-    advice_text  = Column(Text)                             # lời khuyên từ Gemini
+    user_question = Column(Text)                           
+    advice_text  = Column(Text)                             
     created_at   = Column(DateTime, default=datetime.utcnow)

@@ -26,31 +26,24 @@ async def analyze_skin(
     record_id   = str(uuid.uuid4())
     filename    = f"{record_id}.jpg"
 
-    # ── Bước 1a: Classification ─────────────────────────────────────────
     cls  = classify_skin(image_bytes)
-    # {"label": "good"|"bad", "label_vn": "Da đẹp"|"Da xấu"}
 
-    # ── Bước 1b: YOLO ───────────────────────────────────────────────────
     yolo = detect_acne(image_bytes)
-    # {"detections": [...], "summary_detail": "2 acne", ...}
 
-    # ── Bước 2: Tổng hợp summary ────────────────────────────────────────
     summary = f"{cls['label_vn']}. {yolo['summary_detail']}."
 
-    # ── Bước 3: Upload MinIO ────────────────────────────────────────────
     original_url  = save_image(image_bytes,             "original",  filename)
     annotated_url = save_image(yolo["annotated_bytes"], "annotated", filename)
 
-    # ── Bước 4: RAG + Gemini ────────────────────────────────────────────
     advice_text = get_skin_advice(
         skin_label_vn     = cls["label_vn"],
         acne_detected     = yolo["acne_detected"],
         darkspot_detected = yolo["darkspot_detected"],
         summary_detail    = yolo["summary_detail"],
         user_question     = user_question,
+        skin_context      = skin_context,
     )
 
-    # ── Bước 5: Lưu DB ──────────────────────────────────────────────────
     history = DiagnosisHistory(
         id            = record_id,
         user_id       = user_id,
@@ -89,13 +82,11 @@ async def analyze_skin(
 
 @router.get("/history/{user_id}")
 def get_history(user_id: str, db: Session = Depends(get_db)):
-    # Convert sang int an toàn
     try:
         uid = int(user_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="user_id không hợp lệ")
     
-    # Join history + advice để lấy đủ thông tin
     records = (
         db.query(DiagnosisHistory, Advice)
         .outerjoin(Advice, Advice.history_id == DiagnosisHistory.id)

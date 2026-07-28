@@ -27,20 +27,30 @@ export const analyzeSkin = async ({
     formData.append("user_id", payload.sub);
   }
 
+  // Stage 1: upload
   onStageChange?.("Đang tải ảnh lên...");
-  await new Promise((r) => setTimeout(r, 400));
 
-  onStageChange?.("Đang phân loại tình trạng da...");
-  await new Promise((r) => setTimeout(r, 600));
+  // Stage 2: chuyển sau khi request đã bay đi 1 lúc (giả lập classify + yolo đang chạy)
+  const t1 = setTimeout(
+    () => onStageChange?.("Đang nhận diện và phân loại dựa trên ảnh..."),
+    3000
+  );
 
-  onStageChange?.("Đang nhận diện mụn...");
+  // Stage 3: chuyển khi gần xong (giả lập đang gọi Gemini)
+  // 2.5s là ước lượng — chỉnh theo tốc độ thực của BE
+  const t2 = setTimeout(
+    () => onStageChange?.("Đang tạo lời khuyên từ AI..."),10000
+  );
 
-  const res = await axiosClient.post("/api/analyze", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-
-  onStageChange?.("Đang tạo lời khuyên từ AI...");
-  return res.data;
+  try {
+    const res = await axiosClient.post("/api/analyze", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  } finally {
+    clearTimeout(t1);
+    clearTimeout(t2);
+  }
 };
 
 

@@ -9,7 +9,6 @@ def get_user_by_email(db: Session, email: str):
         models.User.email == email
     ).first()
 
-
 def create_user(db: Session, email: str, password: str):
 
     hashed = hash_password(password)

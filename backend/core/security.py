@@ -1,9 +1,12 @@
+import os
+from dotenv import load_dotenv
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 
-SECRET_KEY = "supersecretkey"
-ALGORITHM = "HS256"
+load_dotenv()
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 10 
 REFRESH_TOKEN_EXPIRE_DAYS = 1
@@ -53,7 +56,7 @@ def verify_token(token: str):
 
         return None
     
-    # Tách verify thành 2 hàm
+
 def verify_access_token(token: str):
     payload = verify_token(token)
     if payload and payload.get("type") == "access":

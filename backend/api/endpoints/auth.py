@@ -15,9 +15,7 @@ from backend.core.security import verify_password, hash_password, create_access_
 from jose import jwt
 from backend.services.email_service import send_reset_email
 
-
 router = APIRouter()
-
 
 # REGISTER
 @router.post("/register")
@@ -133,10 +131,9 @@ def reset_password(
         "message": "Password updated"
     }
 
-
 @router.post("/refresh")
 def refresh_token(data: RefreshRequest, db: Session = Depends(get_db)):
-    payload = verify_refresh_token(data.refresh_token)  # dùng hàm mới
+    payload = verify_refresh_token(data.refresh_token)  
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     

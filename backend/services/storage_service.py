@@ -2,8 +2,6 @@ import os
 import uuid
 from pathlib import Path
 
-# Local: lưu vào thư mục uploads/ trong project
-# Docker: mount volume vào /app/uploads
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 def _ensure_dir(folder: str):

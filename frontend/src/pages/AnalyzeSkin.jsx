@@ -1,33 +1,119 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";  
+import { useNavigate, useLocation } from "react-router-dom";
 import { analyzeSkin } from "../api/analyzeApi";
 import useAuthCheck from "../hook/useAuthCheck";
+import ReactMarkdown from "react-markdown";
+
+const SIDEBAR_WIDTH = 220;
+
+const NAV_ITEMS = [
+  { path: "/analyze", icon: "🔬", label: "Phân tích da" },
+  { path: "/history", icon: "📋", label: "Lịch sử"      },
+];
 
 const STAGES = [
   "Đang tải ảnh lên...",
-  "Đang phân loại tình trạng da...",
-  "Đang nhận diện mụn...",
+  "Đang nhận diện và phân loại dựa trên ảnh...",
   "Đang tạo lời khuyên từ AI...",
 ];
 
 const STAGE_ICONS = {
-  "Đang tải ảnh lên...":              "📤",
-  "Đang phân loại tình trạng da...":  "🔍",
-  "Đang nhận diện mụn...":            "🎯",
-  "Đang tạo lời khuyên từ AI...":     "🤖",
+  "Đang tải ảnh lên...":             "📤",
+  "Đang nhận diện và phân loại dựa trên ảnh...": "🔍",
+  "Đang tạo lời khuyên từ AI...":    "🤖",
 };
 
+function Sidebar() {
+  const navigate  = useNavigate();
+  const location  = useLocation();
+
+  const logout = () => {
+    localStorage.clear();
+    navigate("/");
+  };
+
+  return (
+    <div style={{
+      width: SIDEBAR_WIDTH, background: "white",
+      borderRight: "1px solid #e2e8f0", position: "fixed",
+      height: "100vh", display: "flex", flexDirection: "column", zIndex: 10
+    }}>
+      {/* Logo */}
+      <div style={{ padding: "24px 20px", borderBottom: "1px solid #e2e8f0",
+                    display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 28 }}>🏥</span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>
+            Skin Care AI
+          </div>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>
+            Chăm sóc da thông minh
+          </div>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: "16px 12px" }}>
+        {NAV_ITEMS.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <div
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 14px", borderRadius: 10, marginBottom: 4,
+                cursor: "pointer", transition: "all 0.15s",
+                background:  isActive ? "#f0f9ff" : "transparent",
+                color:       isActive ? "#0284c7" : "#64748b",
+                fontWeight:  isActive ? 600 : 400,
+                borderLeft:  isActive ? "3px solid #0284c7" : "3px solid transparent",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.background = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{item.icon}</span>
+              <span style={{ fontSize: 14 }}>{item.label}</span>
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Logout */}
+      <div style={{ padding: "16px 12px", borderTop: "1px solid #e2e8f0" }}>
+        <div
+          onClick={logout}
+          style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+            color: "#ef4444", transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = "#fef2f2"}
+          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+        >
+          <span style={{ fontSize: 18 }}>🚪</span>
+          <span style={{ fontSize: 14, fontWeight: 500 }}>Đăng xuất</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SkinAnalyze() {
-  useAuthCheck(); // ← giữ đúng phân quyền
-  const navigate = useNavigate();
-  const [file,         setFile]         = useState(null);
-  const [preview,      setPreview]      = useState(null);
-  const [skinContext,  setSkinContext]  = useState("");
-  const [userQuestion, setUserQuestion] = useState("");
-  const [stage,        setStage]        = useState("");
-  const [loading,      setLoading]      = useState(false);
-  const [result,       setResult]       = useState(null);
-  const [error,        setError]        = useState("");
+  useAuthCheck();
+
+  const [file,         setFile]        = useState(null);
+  const [preview,      setPreview]     = useState(null);
+  const [skinContext,  setSkinContext] = useState("");
+  const [userQuestion, setUserQuestion]= useState("");
+  const [stage,        setStage]       = useState("");
+  const [loading,      setLoading]     = useState(false);
+  const [result,       setResult]      = useState(null);
+  const [error,        setError]       = useState("");
   const fileRef = useRef();
 
   const handleFile = (e) => {
@@ -44,16 +130,13 @@ export default function SkinAnalyze() {
     setLoading(true);
     setError("");
     setResult(null);
-
     try {
       const data = await analyzeSkin({
-        file,
-        skinContext,
-        userQuestion,
+        file, skinContext, userQuestion,
         onStageChange: setStage,
       });
       setResult(data);
-    } catch (err) {
+    } catch {
       setError("❌ Lỗi phân tích. Vui lòng thử lại!");
     } finally {
       setLoading(false);
@@ -61,212 +144,363 @@ export default function SkinAnalyze() {
     }
   };
 
+  const card = {
+    background: "white", borderRadius: 16,
+    border: "1px solid #e2e8f0", overflow: "hidden",
+    marginBottom: 20,
+  };
+
+  const cardHeader = {
+    padding: "14px 20px", borderBottom: "1px solid #f1f5f9",
+    fontWeight: 600, fontSize: 15, color: "#0f172a",
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc" }}>
+      <Sidebar />
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl">
-          <h1 className="text-3xl font-bold">🔬 Phân tích tình trạng da</h1>
-          <p className="text-pink-100 mt-1">
+      <div style={{ marginLeft: SIDEBAR_WIDTH, flex: 1 }}>
+
+        {/* Topbar */}
+        <div style={{
+          background: "white", borderBottom: "1px solid #e2e8f0",
+          padding: "16px 32px", position: "sticky", top: 0, zIndex: 9
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 20, color: "#0f172a" }}>
+            Phân tích tình trạng da
+          </div>
+          <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>
             Tải ảnh lên để nhận chẩn đoán và lời khuyên từ AI
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-              <button
-                onClick={() => navigate("/history")}
-                className="px-4 py-2 bg-white text-purple-600 font-semibold
-                           rounded-xl hover:bg-purple-50 transition text-sm"
-              >
-                📋 Lịch sử
-              </button>
-        </div>
-
-        {/* Upload + Input */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 space-y-4">
-
-          {/* Upload ảnh */}
-          <div
-            onClick={() => fileRef.current.click()}
-            className="border-2 border-dashed border-purple-300 rounded-xl p-8
-                       text-center cursor-pointer hover:border-purple-500
-                       hover:bg-purple-50 transition"
-          >
-            {preview ? (
-              <img
-                src={preview}
-                alt="preview"
-                className="max-h-64 mx-auto rounded-lg object-contain"
-              />
-            ) : (
-              <div className="text-gray-400 space-y-2">
-                <div className="text-5xl">📷</div>
-                <p className="font-medium">Nhấn để chọn ảnh khuôn mặt</p>
-                <p className="text-sm">JPG, PNG — tối đa 10MB</p>
-              </div>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFile}
-            />
           </div>
-
-          {/* Loại da */}
-          <select
-            value={skinContext}
-            onChange={(e) => setSkinContext(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl p-3 text-gray-700
-                       focus:border-purple-400 outline-none"
-          >
-            <option value="">Loại da (tùy chọn)</option>
-            <option value="da dầu">Da dầu</option>
-            <option value="da khô">Da khô</option>
-            <option value="da hỗn hợp">Da hỗn hợp</option>
-            <option value="da nhạy cảm">Da nhạy cảm</option>
-          </select>
-
-          {/* Câu hỏi */}
-          <textarea
-            rows={2}
-            value={userQuestion}
-            onChange={(e) => setUserQuestion(e.target.value)}
-            placeholder="Câu hỏi của bạn... (ví dụ: Tôi nên dùng sản phẩm gì?)"
-            className="w-full border border-gray-200 rounded-xl p-3 text-gray-700
-                       focus:border-purple-400 outline-none resize-none"
-          />
-
-          {/* Nút phân tích */}
-          <button
-            onClick={handleAnalyze}
-            disabled={!file || loading}
-            className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600
-                       text-white font-bold rounded-xl shadow-md hover:shadow-lg
-                       transition disabled:opacity-50 text-lg"
-          >
-            {loading ? "Đang phân tích..." : "🚀 Phân tích ngay"}
-          </button>
         </div>
 
-        {/* Loading stages */}
-        {loading && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <p className="text-center font-semibold text-purple-600 text-lg mb-4">
-              Quy trình phân tích
-            </p>
-            <div className="space-y-3">
-              {STAGES.map((s) => {
-                const currentIdx = STAGES.indexOf(stage);
-                const thisIdx    = STAGES.indexOf(s);
-                const isDone     = thisIdx < currentIdx;
-                const isCurrent  = s === stage;
+        {/* Content */}
+        <div style={{ padding: 32 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
 
-                return (
+            {/* ── Cột trái ── */}
+            <div>
+              {/* Upload */}
+              <div style={card}>
+                <div style={cardHeader}>📷 Ảnh khuôn mặt</div>
+                <div style={{ padding: 20 }}>
                   <div
-                    key={s}
-                    className={`flex items-center gap-3 p-3 rounded-xl transition
-                      ${isCurrent ? "bg-purple-100 border border-purple-300" : ""}
-                      ${isDone    ? "opacity-40" : ""}`}
+                    onClick={() => fileRef.current.click()}
+                    style={{
+                      border: "2px dashed #cbd5e1", borderRadius: 12,
+                      padding: 32, textAlign: "center", cursor: "pointer",
+                      background: "#f8fafc", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = "#0284c7";
+                      e.currentTarget.style.background  = "#f0f9ff";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "#cbd5e1";
+                      e.currentTarget.style.background  = "#f8fafc";
+                    }}
                   >
-                    <span className="text-2xl">{STAGE_ICONS[s]}</span>
-                    <span className={`font-medium ${isCurrent ? "text-purple-700" : "text-gray-500"}`}>
-                      {s}
-                    </span>
-                    {isCurrent && (
-                      <svg className="ml-auto animate-spin h-5 w-5 text-purple-500" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10"
-                          stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z" />
-                      </svg>
+                    {preview ? (
+                      <img src={preview} alt="preview" style={{
+                        maxHeight: 200, maxWidth: "100%",
+                        borderRadius: 8, objectFit: "contain"
+                      }} />
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
+                        <div style={{ color: "#64748b", fontSize: 14, fontWeight: 500 }}>
+                          Nhấn để chọn ảnh
+                        </div>
+                        <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 4 }}>
+                          JPG, PNG — tối đa 10MB
+                        </div>
+                      </>
                     )}
-                    {isDone && <span className="ml-auto text-green-500 font-bold">✓</span>}
+                    <input ref={fileRef} type="file" accept="image/*"
+                      style={{ display: "none" }} onChange={handleFile} />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 font-medium">
-            {error}
-          </div>
-        )}
-
-        {/* Kết quả */}
-        {result && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 space-y-5">
-            <h2 className="text-2xl font-bold text-gray-800">📊 Kết quả phân tích</h2>
-
-            {/* Tình trạng da */}
-            <div className={`p-4 rounded-xl border-2 ${
-              result.skin_label === "good"
-                ? "bg-green-50 border-green-300"
-                : "bg-orange-50 border-orange-300"
-            }`}>
-              <p className="font-bold text-xl">
-                {result.skin_label === "good" ? "✨ Da đẹp" : "⚠️ Da xấu"}
-              </p>
-              <p className="text-gray-600 mt-1">{result.summary}</p>
-            </div>
-
-            {/* Detections */}
-            {result.detections?.length > 0 && (
-              <div>
-                <p className="font-semibold text-gray-700 mb-2">📋 Phát hiện</p>
-                <div className="flex flex-wrap gap-2">
-                  {result.detections.map((d, i) => (
-                    <span
-                      key={i}
-                      className="px-3 py-1 bg-purple-100 text-purple-700
-                                 rounded-full text-sm font-medium"
-                    >
-                      {d.label}: {d.count} vị trí
-                    </span>
-                  ))}
                 </div>
               </div>
-            )}
 
-            {/* Ảnh bbox */}
-            {result.annotated_b64 && (
-              <div>
-                <p className="font-semibold text-gray-700 mb-2">🎯 Ảnh nhận diện</p>
-                <img
-                  src={`data:image/jpeg;base64,${result.annotated_b64}`}
-                  alt="annotated"
-                  className="w-full rounded-xl border border-gray-200"
-                />
+              {/* Options */}
+              <div style={card}>
+                <div style={cardHeader}>⚙️ Tùy chọn</div>
+                <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: "#64748b",
+                                  fontWeight: 500, marginBottom: 6 }}>
+                      Loại da
+                    </div>
+                    <select
+                      value={skinContext}
+                      onChange={(e) => setSkinContext(e.target.value)}
+                      style={{
+                        width: "100%", padding: "10px 12px", borderRadius: 8,
+                        border: "1px solid #e2e8f0", fontSize: 14,
+                        color: "#0f172a", background: "white",
+                        outline: "none", boxSizing: "border-box"
+                      }}
+                    >
+                      <option value="">Chọn loại da (tùy chọn)</option>
+                      <option value="da dầu">Da dầu</option>
+                      <option value="da khô">Da khô</option>
+                      <option value="da hỗn hợp">Da hỗn hợp</option>
+                      <option value="da nhạy cảm">Da nhạy cảm</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 13, color: "#64748b",
+                                  fontWeight: 500, marginBottom: 6 }}>
+                      Câu hỏi của bạn
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={userQuestion}
+                      onChange={(e) => setUserQuestion(e.target.value)}
+                      placeholder="Ví dụ: Tôi nên dùng sản phẩm gì?"
+                      style={{
+                        width: "100%", padding: "10px 12px", borderRadius: 8,
+                        border: "1px solid #e2e8f0", fontSize: 14,
+                        color: "#0f172a", resize: "none", outline: "none",
+                        fontFamily: "inherit", boxSizing: "border-box"
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={!file || loading}
+                    style={{
+                      width: "100%", padding: "12px 0",
+                      background: (!file || loading)
+                        ? "#e2e8f0"
+                        : "linear-gradient(135deg, #0284c7, #0ea5e9)",
+                      color: (!file || loading) ? "#94a3b8" : "white",
+                      border: "none", borderRadius: 10, fontSize: 15,
+                      fontWeight: 700, cursor: (!file || loading) ? "not-allowed" : "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {loading ? "⏳ Đang phân tích..." : "🚀 Phân tích ngay"}
+                  </button>
+                </div>
               </div>
-            )}
 
-            {/* Lời khuyên */}
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
-              <p className="font-semibold text-blue-800 mb-3">💡 Lời khuyên chăm sóc da</p>
-              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                {result.advice}
-              </p>
+              {/* Loading stages */}
+              {loading && (
+                <div style={card}>
+                  <div style={cardHeader}>⏳ Quy trình phân tích</div>
+                  <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+                    {STAGES.map((s) => {
+                      const currentIdx = STAGES.indexOf(stage);
+                      const thisIdx    = STAGES.indexOf(s);
+                      const isDone     = thisIdx < currentIdx;
+                      const isCurrent  = s === stage;
+                      return (
+                        <div key={s} style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          padding: "10px 14px", borderRadius: 10,
+                          background:  isCurrent ? "#f0f9ff" : "transparent",
+                          border:      isCurrent ? "1px solid #bae6fd" : "1px solid transparent",
+                          opacity:     isDone ? 0.4 : 1,
+                          transition:  "all 0.15s",
+                        }}>
+                          <span style={{ fontSize: 20 }}>{STAGE_ICONS[s]}</span>
+                          <span style={{
+                            fontSize: 14, fontWeight: isCurrent ? 600 : 400,
+                            color: isCurrent ? "#0284c7" : "#64748b", flex: 1
+                          }}>
+                            {s}
+                          </span>
+                          {isCurrent && (
+                            <svg style={{ width: 18, height: 18, color: "#0284c7" }}
+                              className="animate-spin" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10"
+                                stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z" />
+                            </svg>
+                          )}
+                          {isDone && (
+                            <span style={{ color: "#16a34a", fontWeight: 700 }}>✓</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Error */}
+              {error && (
+                <div style={{
+                  background: "#fef2f2", border: "1px solid #fecaca",
+                  borderRadius: 12, padding: "14px 18px",
+                  color: "#dc2626", fontSize: 14, fontWeight: 500
+                }}>
+                  {error}
+                </div>
+              )}
             </div>
 
-            {/* Link xem ảnh đã lưu */}
-            <div className="text-sm text-gray-400 space-y-1">
-              <p>🔗 Ảnh gốc: <a href={`http://localhost:8000${result.image_url}`}
-                className="text-blue-500 underline" target="_blank" rel="noreferrer">
-                xem ảnh</a>
-              </p>
-              <p>🔗 Ảnh bbox: <a href={`http://localhost:8000${result.annotated_url}`}
-                className="text-blue-500 underline" target="_blank" rel="noreferrer">
-                xem ảnh</a>
-              </p>
+            {/* ── Cột phải: Kết quả ── */}
+            <div>
+              {!result && !loading && (
+                <div style={{
+                  ...card, textAlign: "center",
+                  padding: 60, color: "#94a3b8"
+                }}>
+                  <div style={{ fontSize: 56, marginBottom: 16 }}>🔬</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: "#64748b" }}>
+                    Kết quả sẽ hiển thị ở đây
+                  </div>
+                  <div style={{ fontSize: 13, marginTop: 6 }}>
+                    Chọn ảnh và nhấn phân tích để bắt đầu
+                  </div>
+                </div>
+              )}
+
+              {result && (
+                <>
+                  {/* Tình trạng da */}
+                  <div style={card}>
+                    <div style={cardHeader}>📊 Kết quả phân tích</div>
+                    <div style={{ padding: 20 }}>
+                      <div style={{
+                        padding: "14px 18px", borderRadius: 12, marginBottom: 14,
+                        background: result.skin_label === "good" ? "#f0fdf4" : "#fff7ed",
+                        border: `1px solid ${result.skin_label === "good" ? "#86efac" : "#fdba74"}`,
+                      }}>
+                        <div style={{
+                          fontSize: 18, fontWeight: 700,
+                          color: result.skin_label === "good" ? "#16a34a" : "#ea580c"
+                        }}>
+                          {result.skin_label === "good" ? "✨ Da đẹp" : "⚠️ Da xấu"}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                          {result.summary}
+                        </div>
+                      </div>
+
+                      {/* Detections */}
+                      {result.detections?.length > 0 && (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600,
+                                        color: "#64748b", marginBottom: 8 }}>
+                            📋 Phát hiện mụn
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {result.detections.map((d, i) => (
+                              <span key={i} style={{
+                                padding: "4px 12px", borderRadius: 20,
+                                background: "#f5f3ff", color: "#7c3aed",
+                                fontSize: 12, fontWeight: 600
+                              }}>
+                                {d.label}: {d.count} vị trí
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Link ảnh */}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <a href={`http://localhost:8000${result.image_url}`}
+                          target="_blank" rel="noreferrer"
+                          style={{
+                            fontSize: 12, color: "#0284c7",
+                            textDecoration: "none", padding: "4px 10px",
+                            background: "#f0f9ff", borderRadius: 6
+                          }}>
+                          🔗 Ảnh gốc
+                        </a>
+                        <a href={`http://localhost:8000${result.annotated_url}`}
+                          target="_blank" rel="noreferrer"
+                          style={{
+                            fontSize: 12, color: "#0284c7",
+                            textDecoration: "none", padding: "4px 10px",
+                            background: "#f0f9ff", borderRadius: 6
+                          }}>
+                          🔗 Ảnh bbox
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ảnh bbox */}
+                  {result.annotated_b64 && (
+                    <div style={card}>
+                      <div style={cardHeader}>🎯 Ảnh nhận diện mụn</div>
+                      <div style={{ padding: 16 }}>
+                        <img
+                          src={`data:image/jpeg;base64,${result.annotated_b64}`}
+                          alt="annotated"
+                          style={{ width: "100%", borderRadius: 10, objectFit: "contain" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lời khuyên */}
+                  {result.advice && (
+                    <div style={card}>
+                      <div style={cardHeader}>💡 Lời khuyên từ AI</div>
+                      <div style={{ padding: 20 }}>
+                        <div className="markdown-body" style={{
+                          fontSize: 14, color: "#374151", lineHeight: 1.7
+                        }}>
+                          <ReactMarkdown>{result.advice}</ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
+      <style>{`
+      .markdown-body p {
+        margin: 0 0 10px 0;
+      }
+
+      .markdown-body ul,
+      .markdown-body ol {
+        padding-left: 22px;
+        margin: 8px 0;
+      }
+
+      .markdown-body ul { list-style: disc; }
+      .markdown-body ol { list-style: decimal; }
+
+      .markdown-body li {
+        margin: 4px 0;
+      }
+
+      .markdown-body li > p {
+        margin: 0;
+      }
+
+      .markdown-body h1,
+      .markdown-body h2,
+      .markdown-body h3 {
+        margin: 16px 0 8px 0;
+        font-weight: 700;
+        color: #0f172a;
+      }
+
+      .markdown-body h3 { font-size: 15px; }
+      .markdown-body h2 { font-size: 16px; }
+      .markdown-body h1 { font-size: 18px; }
+
+      .markdown-body strong {
+        font-weight: 700;
+        color: #0f172a;
+      }
+    `}</style>
     </div>
   );
 }
+

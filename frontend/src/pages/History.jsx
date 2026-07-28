@@ -1,16 +1,93 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getHistory } from "../api/analyzeApi";
 import useAuthCheck from "../hook/useAuthCheck";
 
-// Nhóm records theo ngày
+const SIDEBAR_WIDTH = 220;
+
+const NAV_ITEMS = [
+  { path: "/analyze", icon: "🔬", label: "Phân tích da" },
+  { path: "/history", icon: "📋", label: "Lịch sử"      },
+];
+
+function Sidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const logout = () => {
+    localStorage.clear();
+    navigate("/");
+  };
+
+  return (
+    <div style={{
+      width: SIDEBAR_WIDTH, background: "white",
+      borderRight: "1px solid #e2e8f0", position: "fixed",
+      height: "100vh", display: "flex", flexDirection: "column", zIndex: 10
+    }}>
+      <div style={{ padding: "24px 20px", borderBottom: "1px solid #e2e8f0",
+                    display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 28 }}>🏥</span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>
+            Skin Care AI
+          </div>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>
+            Chăm sóc da thông minh
+          </div>
+        </div>
+      </div>
+
+      <nav style={{ flex: 1, padding: "16px 12px" }}>
+        {NAV_ITEMS.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <div key={item.path} onClick={() => navigate(item.path)}
+              style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 14px", borderRadius: 10, marginBottom: 4,
+                cursor: "pointer", transition: "all 0.15s",
+                background: isActive ? "#f0f9ff" : "transparent",
+                color:      isActive ? "#0284c7" : "#64748b",
+                fontWeight: isActive ? 600 : 400,
+                borderLeft: isActive ? "3px solid #0284c7" : "3px solid transparent",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.background = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{item.icon}</span>
+              <span style={{ fontSize: 14 }}>{item.label}</span>
+            </div>
+          );
+        })}
+      </nav>
+
+      <div style={{ padding: "16px 12px", borderTop: "1px solid #e2e8f0" }}>
+        <div onClick={logout}
+          style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "10px 14px", borderRadius: 10,
+            cursor: "pointer", color: "#ef4444", transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = "#fef2f2"}
+          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+        >
+          <span style={{ fontSize: 18 }}>🚪</span>
+          <span style={{ fontSize: 14, fontWeight: 500 }}>Đăng xuất</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function groupByDate(records) {
   return records.reduce((groups, record) => {
     const date = new Date(record.created_at).toLocaleDateString("vi-VN", {
-      weekday: "long",
-      year:    "numeric",
-      month:   "long",
-      day:     "numeric",
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
     if (!groups[date]) groups[date] = [];
     groups[date].push(record);
@@ -20,57 +97,67 @@ function groupByDate(records) {
 
 function RecordCard({ record }) {
   const [expanded, setExpanded] = useState(false);
-
   const time = new Date(record.created_at).toLocaleTimeString("vi-VN", {
-    hour:   "2-digit",
-    minute: "2-digit",
+    hour: "2-digit", minute: "2-digit",
   });
 
   return (
-    <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
-
-      {/* Header card */}
+    <div style={{
+      background: "white", borderRadius: 14,
+      border: "1px solid #e2e8f0", overflow: "hidden", marginBottom: 10
+    }}>
+      {/* Header */}
       <div
-        className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition"
         onClick={() => setExpanded(!expanded)}
+        style={{
+          display: "flex", alignItems: "center", gap: 14,
+          padding: "14px 18px", cursor: "pointer", transition: "background 0.15s",
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.background = "#f8fafc"}
+        onMouseLeave={(e) => e.currentTarget.style.background = "white"}
       >
-        {/* Ảnh thumbnail */}
-        <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
+        {/* Thumbnail */}
+        <div style={{
+          width: 56, height: 56, borderRadius: 10, overflow: "hidden",
+          background: "#f1f5f9", flexShrink: 0
+        }}>
           {record.annotated_url ? (
-            <img
-              src={`http://localhost:8000${record.annotated_url}`}
-              alt="annotated"
-              className="w-full h-full object-cover"
-              onError={(e) => { e.target.style.display = "none"; }}
-            />
+            <img src={`http://localhost:8000${record.annotated_url}`}
+              alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              onError={(e) => { e.target.style.display = "none"; }} />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-2xl">
+            <div style={{ width: "100%", height: "100%", display: "flex",
+                          alignItems: "center", justifyContent: "center", fontSize: 22 }}>
               🖼️
             </div>
           )}
         </div>
 
-        {/* Thông tin tóm tắt */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-              record.skin_label === "good"
-                ? "bg-green-100 text-green-700"
-                : "bg-orange-100 text-orange-700"
-            }`}>
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{
+              padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+              background: record.skin_label === "good" ? "#dcfce7" : "#fff7ed",
+              color:      record.skin_label === "good" ? "#16a34a" : "#ea580c",
+            }}>
               {record.skin_label === "good" ? "✨ Da đẹp" : "⚠️ Da xấu"}
             </span>
-            <span className="text-xs text-gray-400">{time}</span>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>{time}</span>
           </div>
-          <p className="text-sm text-gray-600 mt-1 truncate">{record.summary}</p>
-
-          {/* Tags mụn */}
+          <div style={{
+            fontSize: 13, color: "#64748b", marginTop: 4,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+          }}>
+            {record.summary}
+          </div>
           {record.detections?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
               {record.detections.map((d, i) => (
-                <span key={i}
-                  className="px-2 py-0.5 bg-purple-100 text-purple-600
-                             rounded-full text-xs">
+                <span key={i} style={{
+                  padding: "2px 8px", borderRadius: 12,
+                  background: "#f5f3ff", color: "#7c3aed", fontSize: 11
+                }}>
                   {d.label}: {d.count}
                 </span>
               ))}
@@ -79,55 +166,77 @@ function RecordCard({ record }) {
         </div>
 
         {/* Expand icon */}
-        <span className={`text-gray-400 transition-transform duration-200
-          ${expanded ? "rotate-180" : ""}`}>
-          ▼
-        </span>
+        <span style={{
+          color: "#94a3b8", fontSize: 12,
+          transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+          transition: "transform 0.2s"
+        }}>▼</span>
       </div>
 
-      {/* Chi tiết mở rộng */}
+      {/* Expanded */}
       {expanded && (
-        <div className="border-t border-gray-100 p-4 space-y-4 bg-gray-50">
-
-          {/* Ảnh đầy đủ */}
-          <div className="grid grid-cols-2 gap-3">
+        <div style={{
+          borderTop: "1px solid #f1f5f9", padding: 18,
+          background: "#f8fafc", display: "flex", flexDirection: "column", gap: 14
+        }}>
+          {/* Ảnh */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {record.image_url && (
               <div>
-                <p className="text-xs text-gray-500 mb-1 font-medium">📷 Ảnh gốc</p>
-                <img
-                  src={`http://localhost:8000${record.image_url}`}
-                  alt="original"
-                  className="w-full rounded-xl object-cover border border-gray-200"
-                />
+                <div style={{ fontSize: 12, color: "#64748b",
+                              fontWeight: 500, marginBottom: 6 }}>
+                  📷 Ảnh gốc
+                </div>
+                <img src={`http://localhost:8000${record.image_url}`}
+                  alt="original" style={{ width: "100%", borderRadius: 10,
+                  border: "1px solid #e2e8f0", objectFit: "cover" }} />
               </div>
             )}
             {record.annotated_url && (
               <div>
-                <p className="text-xs text-gray-500 mb-1 font-medium">🎯 Ảnh nhận diện</p>
-                <img
-                  src={`http://localhost:8000${record.annotated_url}`}
-                  alt="annotated"
-                  className="w-full rounded-xl object-cover border border-gray-200"
-                />
+                <div style={{ fontSize: 12, color: "#64748b",
+                              fontWeight: 500, marginBottom: 6 }}>
+                  🎯 Ảnh nhận diện
+                </div>
+                <img src={`http://localhost:8000${record.annotated_url}`}
+                  alt="annotated" style={{ width: "100%", borderRadius: 10,
+                  border: "1px solid #e2e8f0", objectFit: "cover" }} />
               </div>
             )}
           </div>
 
           {/* Câu hỏi */}
           {record.user_question && (
-            <div className="bg-white rounded-xl p-3 border border-gray-200">
-              <p className="text-xs text-gray-500 font-medium mb-1">❓ Câu hỏi</p>
-              <p className="text-sm text-gray-700">{record.user_question}</p>
+            <div style={{
+              background: "white", borderRadius: 10, padding: 14,
+              border: "1px solid #e2e8f0"
+            }}>
+              <div style={{ fontSize: 12, color: "#94a3b8",
+                            fontWeight: 500, marginBottom: 4 }}>
+                ❓ Câu hỏi
+              </div>
+              <div style={{ fontSize: 13, color: "#374151" }}>
+                {record.user_question}
+              </div>
             </div>
           )}
 
           {/* Lời khuyên */}
           {record.advice && (
-            <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-              <p className="text-xs text-blue-600 font-medium mb-1">💡 Lời khuyên từ AI</p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+            <div style={{
+              background: "#eff6ff", borderRadius: 10, padding: 14,
+              border: "1px solid #bfdbfe"
+            }}>
+              <div style={{ fontSize: 12, color: "#2563eb",
+                            fontWeight: 500, marginBottom: 4 }}>
+                💡 Lời khuyên từ AI
+              </div>
+              <div style={{
+                fontSize: 13, color: "#374151",
+                whiteSpace: "pre-wrap", lineHeight: 1.7
+              }}>
                 {record.advice}
-              </p>
+              </div>
             </div>
           )}
         </div>
@@ -137,134 +246,154 @@ function RecordCard({ record }) {
 }
 
 export default function History() {
-  useAuthCheck(); // ← giữ phân quyền
+  useAuthCheck();
+  const navigate = useNavigate();
 
-  const navigate  = useNavigate();
-  const [records, setRecords]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error,   setError]     = useState("");
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState("");
 
   useEffect(() => {
-    const fetchHistory = async () => {
+    const fetch = async () => {
       try {
         const data = await getHistory();
         setRecords(data);
       } catch {
-        setError("❌ Không thể tải lịch sử. Vui lòng thử lại!");
+        setError("❌ Không thể tải lịch sử.");
       } finally {
         setLoading(false);
       }
     };
-    fetchHistory();
+    fetch();
   }, []);
 
   const grouped = groupByDate(records);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc" }}>
+      <Sidebar />
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-500 to-indigo-600
-                        rounded-2xl p-6 text-white shadow-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">📋 Lịch sử chẩn đoán</h1>
-              <p className="text-purple-100 mt-1">
-                Theo dõi tiến trình chăm sóc da của bạn
-              </p>
+      <div style={{ marginLeft: SIDEBAR_WIDTH, flex: 1 }}>
+
+        {/* Topbar */}
+        <div style={{
+          background: "white", borderBottom: "1px solid #e2e8f0",
+          padding: "16px 32px", position: "sticky", top: 0, zIndex: 9,
+          display: "flex", alignItems: "center", justifyContent: "space-between"
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: "#0f172a" }}>
+              Lịch sử chẩn đoán
             </div>
-            <button
-              onClick={() => navigate("/analyze")}
-              className="px-4 py-2 bg-white text-purple-600 font-semibold
-                         rounded-xl hover:bg-purple-50 transition text-sm"
-            >
-              + Phân tích mới
-            </button>
+            <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>
+              Theo dõi tiến trình chăm sóc da của bạn
+            </div>
           </div>
-
-          {/* Tổng số lần */}
-          {records.length > 0 && (
-            <div className="mt-4 flex gap-4">
-              <div className="bg-white/20 rounded-xl px-4 py-2 text-center">
-                <p className="text-2xl font-bold">{records.length}</p>
-                <p className="text-xs text-purple-100">Lần chẩn đoán</p>
-              </div>
-              <div className="bg-white/20 rounded-xl px-4 py-2 text-center">
-                <p className="text-2xl font-bold">
-                  {records.filter((r) => r.skin_label === "good").length}
-                </p>
-                <p className="text-xs text-purple-100">Lần da đẹp</p>
-              </div>
-              <div className="bg-white/20 rounded-xl px-4 py-2 text-center">
-                <p className="text-2xl font-bold">
-                  {records.filter((r) => r.skin_label === "bad").length}
-                </p>
-                <p className="text-xs text-purple-100">Lần da xấu</p>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={() => navigate("/analyze")}
+            style={{
+              padding: "8px 18px", background: "#0284c7", color: "white",
+              border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: "pointer"
+            }}
+          >
+            + Phân tích mới
+          </button>
         </div>
 
-        {/* Loading */}
-        {loading && (
-          <div className="text-center py-16 text-purple-400">
-            <svg className="animate-spin h-10 w-10 mx-auto mb-3" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10"
-                stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z" />
-            </svg>
-            <p className="font-medium">Đang tải lịch sử...</p>
-          </div>
-        )}
+        {/* Content */}
+        <div style={{ padding: 32 }}>
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4
-                          text-red-700 font-medium">
-            {error}
-          </div>
-        )}
-
-        {/* Empty */}
-        {!loading && !error && records.length === 0 && (
-          <div className="text-center py-16 bg-white rounded-2xl shadow-md">
-            <span className="text-6xl">🔍</span>
-            <p className="text-gray-500 mt-4 text-lg font-medium">
-              Chưa có lịch sử chẩn đoán
-            </p>
-            <button
-              onClick={() => navigate("/analyze")}
-              className="mt-4 px-6 py-3 bg-gradient-to-r from-pink-500
-                         to-purple-600 text-white font-bold rounded-xl"
-            >
-              Phân tích ngay
-            </button>
-          </div>
-        )}
-
-        {/* Nhóm theo ngày */}
-        {!loading && Object.entries(grouped).map(([date, dayRecords]) => (
-          <div key={date} className="space-y-3">
-
-            {/* Nhãn ngày */}
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-purple-200" />
-              <span className="text-sm font-semibold text-purple-600
-                               bg-purple-50 px-3 py-1 rounded-full border
-                               border-purple-200">
-                📅 {date}
-              </span>
-              <div className="h-px flex-1 bg-purple-200" />
+          {/* Stat cards */}
+          {records.length > 0 && (
+            <div style={{ display: "flex", gap: 16, marginBottom: 28 }}>
+              {[
+                { label: "Tổng chẩn đoán", value: records.length, color: "#0284c7", bg: "#f0f9ff", border: "#bae6fd" },
+                { label: "Lần da đẹp", value: records.filter(r => r.skin_label === "good").length, color: "#16a34a", bg: "#f0fdf4", border: "#86efac" },
+                { label: "Lần da xấu", value: records.filter(r => r.skin_label === "bad").length,  color: "#ea580c", bg: "#fff7ed", border: "#fdba74" },
+              ].map((s) => (
+                <div key={s.label} style={{
+                  background: s.bg, borderRadius: 12, padding: "16px 24px",
+                  border: `1px solid ${s.border}`, textAlign: "center", minWidth: 120
+                }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: s.color }}>
+                    {s.value}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                    {s.label}
+                  </div>
+                </div>
+              ))}
             </div>
+          )}
 
-            {/* Cards trong ngày */}
-            {dayRecords.map((record) => (
-              <RecordCard key={record.record_id} record={record} />
-            ))}
-          </div>
-        ))}
+          {/* Loading */}
+          {loading && (
+            <div style={{ textAlign: "center", padding: 60, color: "#94a3b8" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>Đang tải lịch sử...</div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              background: "#fef2f2", border: "1px solid #fecaca",
+              borderRadius: 12, padding: "14px 18px",
+              color: "#dc2626", fontSize: 14
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Empty */}
+          {!loading && !error && records.length === 0 && (
+            <div style={{
+              background: "white", borderRadius: 16, border: "1px solid #e2e8f0",
+              textAlign: "center", padding: 60
+            }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "#64748b" }}>
+                Chưa có lịch sử chẩn đoán
+              </div>
+              <button
+                onClick={() => navigate("/analyze")}
+                style={{
+                  marginTop: 16, padding: "10px 24px",
+                  background: "#0284c7", color: "white",
+                  border: "none", borderRadius: 8,
+                  fontSize: 14, fontWeight: 600, cursor: "pointer"
+                }}
+              >
+                Phân tích ngay
+              </button>
+            </div>
+          )}
+
+          {/* Grouped records */}
+          {!loading && Object.entries(grouped).map(([date, dayRecords]) => (
+            <div key={date} style={{ marginBottom: 24 }}>
+              {/* Date divider */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 12, marginBottom: 12
+              }}>
+                <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+                <span style={{
+                  fontSize: 12, fontWeight: 600, color: "#64748b",
+                  background: "#f1f5f9", padding: "4px 14px",
+                  borderRadius: 20, border: "1px solid #e2e8f0"
+                }}>
+                  📅 {date}
+                </span>
+                <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+              </div>
+
+              {dayRecords.map((record) => (
+                <RecordCard key={record.record_id} record={record} />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
