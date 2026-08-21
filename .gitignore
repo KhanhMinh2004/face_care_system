@@ -18,6 +18,7 @@ __pycache__/
 
 # ── Environment variables (bảo mật) ──────────────────────────────────────
 .env
+.env.dev
 .env.local
 .env.production
 
