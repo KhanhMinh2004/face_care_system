@@ -2,9 +2,9 @@ import uuid
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.ml.classification_service import classify_skin
-from backend.ml.yolo_service            import detect_acne
-from backend.ml.rag_service             import get_skin_advice
+from backend.services.classification_service import classify_skin
+from backend.services.yolo_service            import detect_acne
+from backend.services.rag_service             import get_skin_advice
 from backend.services.storage_service     import save_image
 from backend.db.models                  import DiagnosisHistory, Advice
 from backend.db.database                import get_db
