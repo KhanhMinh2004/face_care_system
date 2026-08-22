@@ -19,9 +19,10 @@ class OpenRouterProvider(LLMProvider):
             "Content-Type": "application/json"
         }
 
-    async def generate(self, messages: list[dict[str, str]], **kwargs) -> str:
+    async def generate(self, messages: list[dict[str, str]], model: str = None, **kwargs) -> str:
+        selected_model = model or self.model
         payload = {
-            "model": self.model,
+            "model": selected_model,
             "messages": messages,
             "stream": False,
             **kwargs

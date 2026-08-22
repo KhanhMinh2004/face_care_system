@@ -8,6 +8,7 @@ from backend.services.rag_service             import get_skin_advice
 from backend.services.storage_service     import save_image
 from backend.db.models                  import DiagnosisHistory, Advice
 from backend.db.database                import get_db
+from backend.services.llm.factory       import create_llm_router
 
 router = APIRouter()
 
@@ -35,7 +36,10 @@ async def analyze_skin(
     original_url  = save_image(image_bytes,             "original",  filename)
     annotated_url = save_image(yolo["annotated_bytes"], "annotated", filename)
 
-    advice_text = get_skin_advice(
+    llm = create_llm_router()
+
+    advice_text = await get_skin_advice(
+        llm=llm,
         skin_label_vn     = cls["label_vn"],
         acne_detected     = yolo["acne_detected"],
         darkspot_detected = yolo["darkspot_detected"],

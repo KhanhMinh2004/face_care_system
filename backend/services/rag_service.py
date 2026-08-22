@@ -1,26 +1,21 @@
 import os
-import google.generativeai as genai
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from backend.services.llm.base import LLMProvider
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # ---------- Config ----------
 VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-GEMINI_MODEL = "gemini-2.5-flash"
 
 if not VECTOR_STORE_PATH:
     raise RuntimeError("Missing VECTOR_STORE_PATH env var")
-if not GEMINI_API_KEY:
-    raise RuntimeError("Missing GEMINI_API_KEY env var")
+
 
 # ---------- Lazy singletons ----------
 _vector_db = None
-_gemini_model = None
-
 
 def _get_vector_db():
     global _vector_db
@@ -36,16 +31,8 @@ def _get_vector_db():
     return _vector_db
 
 
-def _get_gemini():
-    global _gemini_model
-    if _gemini_model is None:
-        genai.configure(api_key=GEMINI_API_KEY)
-        _gemini_model = genai.GenerativeModel(GEMINI_MODEL)
-        print("[RAG] ✅ Gemini model ready")
-    return _gemini_model
-
-
-def _rewrite_prompt(
+async def _rewrite_prompt(
+    llm: LLMProvider,
     user_question: str,
     summary_detail: str,
     skin_context: str,
@@ -74,7 +61,11 @@ QUY TẮC BẮT BUỘC:
 
 Ví dụ output đúng: da dầu mụn, mụn viêm, BHA, salicylic acid, kiềm dầu, chăm sóc da mụn
 """
-    raw = _get_gemini().generate_content(prompt).text
+    raw = await llm.generate(
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
     print(f"[RAG] Rewritten query: {raw}")
     return raw
 
@@ -85,7 +76,8 @@ def _retrieve_knowledge(query: str, k: int = 3) -> str:
     docs = _get_vector_db().similarity_search(query, k=k)
     return "\n\n".join(doc.page_content for doc in docs)
 
-def get_skin_advice(
+async def get_skin_advice(
+    llm: LLMProvider,
     skin_label_vn: str,
     acne_detected: bool,
     darkspot_detected: bool,
@@ -117,8 +109,8 @@ def get_skin_advice(
         enriched_question = f"{user_question} (lưu ý: {', '.join(extras)})"
 
     # Rewrite -> retrieve
-    rag_query = _rewrite_prompt(
-        enriched_question, summary_detail, skin_context, skin_label_vn
+    rag_query = await _rewrite_prompt(
+        llm, enriched_question, summary_detail, skin_context, skin_label_vn
     )
     context = _retrieve_knowledge(rag_query)
     print(f"[RAG] Retrieved context length: {len(context)} chars")
@@ -141,4 +133,8 @@ Trả lời tiếng Việt, rõ ràng, dễ hiểu. Nếu kiến thức trên kh
 """.strip()
 
     print(f"[RAG] Final prompt for generation:\n{final_prompt}")
-    return _get_gemini().generate_content(final_prompt).text
+    return await llm.generate(
+        messages=[
+            {"role": "user", "content": final_prompt}
+        ]
+    )
