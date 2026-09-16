@@ -2,6 +2,7 @@ import os
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from backend.services.llm.base import LLMProvider
+from collections.abc import AsyncIterator
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -76,7 +77,7 @@ def _retrieve_knowledge(query: str, k: int = 3) -> str:
     docs = _get_vector_db().similarity_search(query, k=k)
     return "\n\n".join(doc.page_content for doc in docs)
 
-async def get_skin_advice(
+async def build_final_prompt(
     llm: LLMProvider,
     skin_label_vn: str,
     acne_detected: bool,
@@ -131,10 +132,45 @@ Câu hỏi: {user_question}
 Trả lời tiếng Việt, rõ ràng, dễ hiểu. Nếu kiến thức trên không đủ
 để trả lời không được bịa và hãy nói rõ thay vì suy đoán.
 """.strip()
+    return final_prompt
 
-    print(f"[RAG] Final prompt for generation:\n{final_prompt}")
+async def get_skin_advice(
+    llm: LLMProvider,
+    skin_label_vn: str,
+    acne_detected: bool,
+    darkspot_detected: bool,
+    summary_detail: str,
+    user_question: str = "Tôi nên chăm sóc da như thế nào?",
+    skin_context: str = "",
+):
+
+    final_prompt = await build_final_prompt(
+        llm, skin_label_vn, acne_detected, darkspot_detected, summary_detail, user_question, skin_context
+    )
+
     return await llm.generate(
         messages=[
             {"role": "user", "content": final_prompt}
         ]
     )
+
+async def stream_skin_advice(
+    llm: LLMProvider,
+    skin_label_vn: str,
+    acne_detected: bool,
+    darkspot_detected: bool,
+    summary_detail: str,
+    user_question: str = "Tôi nên chăm sóc da như thế nào?",
+    skin_context: str = "",
+) -> AsyncIterator[str]:
+
+    final_prompt = await build_final_prompt(
+        llm, skin_label_vn, acne_detected, darkspot_detected, summary_detail, user_question, skin_context
+    )
+
+    async for chunk in llm.stream(
+        messages=[
+            {"role": "user", "content": final_prompt}
+        ]
+    ):
+        yield chunk

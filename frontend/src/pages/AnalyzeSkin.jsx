@@ -8,7 +8,7 @@ const SIDEBAR_WIDTH = 220;
 
 const NAV_ITEMS = [
   { path: "/analyze", icon: "🔬", label: "Phân tích da" },
-  { path: "/history", icon: "📋", label: "Lịch sử"      },
+  { path: "/history", icon: "📋", label: "Lịch sử" },
 ];
 
 const STAGES = [
@@ -18,14 +18,14 @@ const STAGES = [
 ];
 
 const STAGE_ICONS = {
-  "Đang tải ảnh lên...":             "📤",
+  "Đang tải ảnh lên...": "📤",
   "Đang nhận diện và phân loại dựa trên ảnh...": "🔍",
-  "Đang tạo lời khuyên từ AI...":    "🤖",
+  "Đang tạo lời khuyên từ AI...": "🤖",
 };
 
 function Sidebar() {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const logout = () => {
     localStorage.clear();
@@ -39,8 +39,10 @@ function Sidebar() {
       height: "100vh", display: "flex", flexDirection: "column", zIndex: 10
     }}>
       {/* Logo */}
-      <div style={{ padding: "24px 20px", borderBottom: "1px solid #e2e8f0",
-                    display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{
+        padding: "24px 20px", borderBottom: "1px solid #e2e8f0",
+        display: "flex", alignItems: "center", gap: 10
+      }}>
         <span style={{ fontSize: 28 }}>🏥</span>
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>
@@ -64,10 +66,10 @@ function Sidebar() {
                 display: "flex", alignItems: "center", gap: 12,
                 padding: "10px 14px", borderRadius: 10, marginBottom: 4,
                 cursor: "pointer", transition: "all 0.15s",
-                background:  isActive ? "#f0f9ff" : "transparent",
-                color:       isActive ? "#0284c7" : "#64748b",
-                fontWeight:  isActive ? 600 : 400,
-                borderLeft:  isActive ? "3px solid #0284c7" : "3px solid transparent",
+                background: isActive ? "#f0f9ff" : "transparent",
+                color: isActive ? "#0284c7" : "#64748b",
+                fontWeight: isActive ? 600 : 400,
+                borderLeft: isActive ? "3px solid #0284c7" : "3px solid transparent",
               }}
               onMouseEnter={(e) => {
                 if (!isActive) e.currentTarget.style.background = "#f8fafc";
@@ -106,14 +108,15 @@ function Sidebar() {
 export default function SkinAnalyze() {
   useAuthCheck();
 
-  const [file,         setFile]        = useState(null);
-  const [preview,      setPreview]     = useState(null);
-  const [skinContext,  setSkinContext] = useState("");
-  const [userQuestion, setUserQuestion]= useState("");
-  const [stage,        setStage]       = useState("");
-  const [loading,      setLoading]     = useState(false);
-  const [result,       setResult]      = useState(null);
-  const [error,        setError]       = useState("");
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [skinContext, setSkinContext] = useState("");
+  const [userQuestion, setUserQuestion] = useState("");
+  const [stage, setStage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [streamingAdvice, setStreamingAdvice] = useState("");
   const fileRef = useRef();
 
   const handleFile = (e) => {
@@ -127,15 +130,24 @@ export default function SkinAnalyze() {
 
   const handleAnalyze = async () => {
     if (!file) return;
+
     setLoading(true);
     setError("");
     setResult(null);
+    setStreamingAdvice("");
+
     try {
       const data = await analyzeSkin({
         file, skinContext, userQuestion,
         onStageChange: setStage,
+        onChunk: (chunk) => {
+          setStreamingAdvice((prev) => prev + chunk);
+        },
+        onResult: (data) => {
+          console.log("Final result received:", data);
+          setResult(data);
+        },
       });
-      setResult(data);
     } catch {
       setError("❌ Lỗi phân tích. Vui lòng thử lại!");
     } finally {
@@ -193,11 +205,11 @@ export default function SkinAnalyze() {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = "#0284c7";
-                      e.currentTarget.style.background  = "#f0f9ff";
+                      e.currentTarget.style.background = "#f0f9ff";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.borderColor = "#cbd5e1";
-                      e.currentTarget.style.background  = "#f8fafc";
+                      e.currentTarget.style.background = "#f8fafc";
                     }}
                   >
                     {preview ? (
@@ -227,8 +239,10 @@ export default function SkinAnalyze() {
                 <div style={cardHeader}>⚙️ Tùy chọn</div>
                 <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 13, color: "#64748b",
-                                  fontWeight: 500, marginBottom: 6 }}>
+                    <div style={{
+                      fontSize: 13, color: "#64748b",
+                      fontWeight: 500, marginBottom: 6
+                    }}>
                       Loại da
                     </div>
                     <select
@@ -250,8 +264,10 @@ export default function SkinAnalyze() {
                   </div>
 
                   <div>
-                    <div style={{ fontSize: 13, color: "#64748b",
-                                  fontWeight: 500, marginBottom: 6 }}>
+                    <div style={{
+                      fontSize: 13, color: "#64748b",
+                      fontWeight: 500, marginBottom: 6
+                    }}>
                       Câu hỏi của bạn
                     </div>
                     <textarea
@@ -294,17 +310,17 @@ export default function SkinAnalyze() {
                   <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
                     {STAGES.map((s) => {
                       const currentIdx = STAGES.indexOf(stage);
-                      const thisIdx    = STAGES.indexOf(s);
-                      const isDone     = thisIdx < currentIdx;
-                      const isCurrent  = s === stage;
+                      const thisIdx = STAGES.indexOf(s);
+                      const isDone = thisIdx < currentIdx;
+                      const isCurrent = s === stage;
                       return (
                         <div key={s} style={{
                           display: "flex", alignItems: "center", gap: 12,
                           padding: "10px 14px", borderRadius: 10,
-                          background:  isCurrent ? "#f0f9ff" : "transparent",
-                          border:      isCurrent ? "1px solid #bae6fd" : "1px solid transparent",
-                          opacity:     isDone ? 0.4 : 1,
-                          transition:  "all 0.15s",
+                          background: isCurrent ? "#f0f9ff" : "transparent",
+                          border: isCurrent ? "1px solid #bae6fd" : "1px solid transparent",
+                          opacity: isDone ? 0.4 : 1,
+                          transition: "all 0.15s",
                         }}>
                           <span style={{ fontSize: 20 }}>{STAGE_ICONS[s]}</span>
                           <span style={{
@@ -386,8 +402,10 @@ export default function SkinAnalyze() {
                       {/* Detections */}
                       {result.detections?.length > 0 && (
                         <div style={{ marginBottom: 14 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600,
-                                        color: "#64748b", marginBottom: 8 }}>
+                          <div style={{
+                            fontSize: 13, fontWeight: 600,
+                            color: "#64748b", marginBottom: 8
+                          }}>
                             📋 Phát hiện mụn
                           </div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -429,33 +447,60 @@ export default function SkinAnalyze() {
                   </div>
 
                   {/* Ảnh bbox */}
-                  {result.annotated_b64 && (
+                  {result.annotated_url && (
                     <div style={card}>
                       <div style={cardHeader}>🎯 Ảnh nhận diện mụn</div>
                       <div style={{ padding: 16 }}>
                         <img
-                          src={`data:image/jpeg;base64,${result.annotated_b64}`}
+                          src={`http://localhost:8000${result.annotated_url}`}
                           alt="annotated"
                           style={{ width: "100%", borderRadius: 10, objectFit: "contain" }}
+                          onError={(e) => {
+                            console.error("Error loading annotated image:", e);
+                          }}
                         />
                       </div>
                     </div>
                   )}
-
-                  {/* Lời khuyên */}
-                  {result.advice && (
-                    <div style={card}>
-                      <div style={cardHeader}>💡 Lời khuyên từ AI</div>
-                      <div style={{ padding: 20 }}>
-                        <div className="markdown-body" style={{
-                          fontSize: 14, color: "#374151", lineHeight: 1.7
-                        }}>
-                          <ReactMarkdown>{result.advice}</ReactMarkdown>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </>
+              )}
+
+              {/* Lời khuyên STREAMING */}
+              {streamingAdvice && (
+                <div style={card}>
+                  <div style={cardHeader}>💡 Lời khuyên từ AI</div>
+                  <div style={{ padding: 20 }}>
+                    <div className="markdown-body" style={{
+                      fontSize: 14, color: "#374151", lineHeight: 1.7
+                    }}>
+                      <ReactMarkdown>{streamingAdvice}</ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* LỜI KHUYÊN FINAL */}
+              {result?.advice && (
+                <div style={card}>
+                  <div style={cardHeader}>
+                    💡 Lời khuyên từ AI
+                  </div>
+
+                  <div style={{ padding: 20 }}>
+                    <div
+                      className="markdown-body"
+                      style={{
+                        fontSize: 14,
+                        color: "#374151",
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      <ReactMarkdown>
+                        {result.advice}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -504,3 +549,19 @@ export default function SkinAnalyze() {
   );
 }
 
+
+//     {/* Lời khuyên */}
+//     {(result.advice || streamingAdvice) && (
+//       <div style={card}>
+//         <div style={cardHeader}>💡 Lời khuyên từ AI</div>
+//         <div style={{ padding: 20 }}>
+//           <div className="markdown-body" style={{
+//             fontSize: 14, color: "#374151", lineHeight: 1.7
+//           }}>
+//             <ReactMarkdown>{result.advice || streamingAdvice}</ReactMarkdown>
+//           </div>
+//         </div>
+//       </div>
+//     )}
+//   </>
+// )}

@@ -1,16 +1,25 @@
 import uuid
+import json
+from collections.abc import AsyncGenerator
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.services.classification_service import classify_skin
 from backend.services.yolo_service            import detect_acne
-from backend.services.rag_service             import get_skin_advice
+from backend.services.rag_service             import get_skin_advice, stream_skin_advice
 from backend.services.storage_service     import save_image
 from backend.db.models                  import DiagnosisHistory, Advice
 from backend.db.database                import get_db
 from backend.services.llm.factory       import create_llm_router
 
 router = APIRouter()
+
+def _sse_event(event: str, data: dict)-> str:
+    return (
+        f"event: {event}\n"
+        f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    )
 
 @router.post("")
 async def analyze_skin(
@@ -36,19 +45,12 @@ async def analyze_skin(
     original_url  = save_image(image_bytes,             "original",  filename)
     annotated_url = save_image(yolo["annotated_bytes"], "annotated", filename)
 
+
     llm = create_llm_router()
 
-    advice_text = await get_skin_advice(
-        llm=llm,
-        skin_label_vn     = cls["label_vn"],
-        acne_detected     = yolo["acne_detected"],
-        darkspot_detected = yolo["darkspot_detected"],
-        summary_detail    = yolo["summary_detail"],
-        user_question     = user_question,
-        skin_context      = skin_context,
-    )
+    async def event_generator() -> AsyncGenerator[str, None]:
 
-    history = DiagnosisHistory(
+        history = DiagnosisHistory(
         id            = record_id,
         user_id       = user_id,
         skin_label    = cls["label"],
@@ -58,30 +60,67 @@ async def analyze_skin(
         image_url     = original_url,
         annotated_url = annotated_url,
         skin_context  = skin_context,
-    )
-    db.add(history)
-    db.flush()
+        )
+        db.add(history)
+        db.flush()
 
-    advice = Advice(
-        history_id    = record_id,
-        user_id       = user_id,
-        user_question = user_question,
-        advice_text   = advice_text,
-    )
-    db.add(advice)
-    db.commit()
 
-    return {
-        "record_id":      record_id,
-        "skin_label":     cls["label"],
-        "skin_label_vn":  cls["label_vn"],
-        "detections":     yolo["detections"],
-        "summary":        summary,
-        "advice":         advice_text,
-        "annotated_b64":  yolo["annotated_b64"],
-        "annotated_url":  annotated_url,   # /uploads/annotated/{uuid}.jpg
-        "image_url":      original_url,    # /uploads/original/{uuid}.jpg
-    }
+        yield _sse_event(
+            "result",
+            {
+                "record_id":      record_id,
+                "skin_label":     cls["label"],
+                "skin_label_vn":  cls["label_vn"],
+                "detections":     yolo["detections"],
+                "summary":        summary,
+                "annotated_b64":  yolo["annotated_b64"],
+                "annotated_url":  annotated_url,   
+                "image_url":      original_url,    
+            }
+        )
+
+
+        full_advice = []
+        try:
+            async for chunk in stream_skin_advice(
+                llm=llm,
+                skin_label_vn     = cls["label_vn"],
+                acne_detected     = yolo["acne_detected"],
+                darkspot_detected = yolo["darkspot_detected"],
+                summary_detail    = yolo["summary_detail"],
+                user_question     = user_question,
+                skin_context      = skin_context,
+            ):
+                full_advice.append(chunk)
+                yield _sse_event("token", {"content": chunk})
+
+        except Exception as exc:
+
+            db.rollback()
+            yield _sse_event("error", {"message": str(exc)})
+            return
+
+
+        advice_text = "".join(full_advice)
+
+
+        advice = Advice(
+            history_id    = record_id,
+            user_id       = user_id,
+            user_question = user_question,
+            advice_text   = advice_text,
+        )
+        db.add(advice)
+        db.commit()
+
+
+        yield _sse_event("done", {"record_id": record_id})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/history/{user_id}")
